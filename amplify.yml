@@ -1,0 +1,18 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - env | grep -e DEADLINES_TABLE -e USER_DATA_TABLE -e SESSIONS_TABLE -e APP_ORIGIN -e NEXT_PUBLIC_VAPID_PUBLIC_KEY >> .env.production
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*
