@@ -115,6 +115,7 @@ export async function handler() {
           ExpressionAttributeValues: { ":pk": item.pk, ":sk": "PUSH#" },
         }),
       );
+      let delivered = 0;
       for (const subscription of subscriptions.Items ?? []) {
         try {
           await webpush.sendNotification(
@@ -126,6 +127,7 @@ export async function handler() {
             }),
           );
           sent += 1;
+          delivered += 1;
         } catch (error) {
           const statusCode = pushErrorStatus(error);
           console.error(
@@ -156,6 +158,7 @@ export async function handler() {
           }
         }
       }
+      if (delivered === 0) continue;
       if (!item.notifiedDays) {
         await dynamo.send(
           new UpdateCommand({
