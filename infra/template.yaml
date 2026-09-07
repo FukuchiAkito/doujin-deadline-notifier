@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: Doujin deadline notifier MVP scheduled jobs and DynamoDB tables
 
+Parameters:
+  VapidPublicKey:
+    Type: String
+    Description: VAPID public key paired with the private key in SSM Parameter Store
+
 Globals:
   Function:
     Runtime: nodejs22.x
@@ -101,8 +106,8 @@ Resources:
       Environment:
         Variables:
           VAPID_PRIVATE_KEY_PARAMETER: /doujin-deadline-notifier/vapid-private-key
-          VAPID_PUBLIC_KEY: BEntyHTTuwo98TCAhJapuzh_2ioTi1va4e9Kam6zOTvtYuMISlk4pbQknI9XtA3mNiIA-LXUSuD3gwNYn9Ll11s
-          VAPID_SUBJECT: https://doujin-deadline-notifier.example.com
+          VAPID_PUBLIC_KEY: !Ref VapidPublicKey
+          VAPID_SUBJECT: https://main.d3cnnf07w82zjd.amplifyapp.com
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref DeadlinesTable

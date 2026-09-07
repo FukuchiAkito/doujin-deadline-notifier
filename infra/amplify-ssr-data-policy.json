@@ -1,0 +1,33 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:Query"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:ap-northeast-1:844840482118:table/doujin-deadline-notifier-DeadlinesTable-YVD02ZOAUK7P",
+        "arn:aws:dynamodb:ap-northeast-1:844840482118:table/doujin-deadline-notifier-UserDataTable-1CMI3SRGT7Z16",
+        "arn:aws:dynamodb:ap-northeast-1:844840482118:table/doujin-deadline-notifier-UserDataTable-1CMI3SRGT7Z16/index/DeadlineIndex"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem"
+      ],
+      "Resource": "arn:aws:dynamodb:ap-northeast-1:844840482118:table/doujin-deadline-notifier-SessionsTable-F9UEWK4TA4O1"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:DeleteItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem"
+      ],
+      "Resource": "arn:aws:dynamodb:ap-northeast-1:844840482118:table/doujin-deadline-notifier-UserDataTable-1CMI3SRGT7Z16"
+    }
+  ]
+}
