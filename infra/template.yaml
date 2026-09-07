@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Doujin deadline notifier MVP scheduled jobs and DynamoDB tables
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    MemorySize: 256
+    Timeout: 30
+    Environment:
+      Variables:
+        DEADLINES_TABLE: !Ref DeadlinesTable
+        USER_DATA_TABLE: !Ref UserDataTable
+
+Resources:
+  DeadlinesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  UserDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: gsi1pk
+          AttributeType: S
+        - AttributeName: gsi1sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: DeadlineIndex
+          KeySchema:
+            - AttributeName: gsi1pk
+              KeyType: HASH
+            - AttributeName: gsi1sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  SessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: tokenHash
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tokenHash
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+  ScraperFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../
+      Handler: functions/scraper/index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DeadlinesTable
+      Events:
+        DailyScrape:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(0 6 * * ? *)
+            ScheduleExpressionTimezone: Asia/Tokyo
+            FlexibleTimeWindow:
+              Mode: "OFF"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - functions/scraper/index.ts
+        Target: es2022
+
+  ReminderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../
+      Handler: functions/reminder/index.handler
+      Environment:
+        Variables:
+          VAPID_PRIVATE_KEY_PARAMETER: /doujin-deadline-notifier/vapid-private-key
+          VAPID_PUBLIC_KEY: BEntyHTTuwo98TCAhJapuzh_2ioTi1va4e9Kam6zOTvtYuMISlk4pbQknI9XtA3mNiIA-LXUSuD3gwNYn9Ll11s
+          VAPID_SUBJECT: https://doujin-deadline-notifier.example.com
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref DeadlinesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UserDataTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource:
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/doujin-deadline-notifier/vapid-private-key
+      Events:
+        DailyReminder:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(0 9 * * ? *)
+            ScheduleExpressionTimezone: Asia/Tokyo
+            FlexibleTimeWindow:
+              Mode: "OFF"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - functions/reminder/index.ts
+        Target: es2022
+
+Outputs:
+  DeadlinesTableName:
+    Value: !Ref DeadlinesTable
+  UserDataTableName:
+    Value: !Ref UserDataTable
+  SessionsTableName:
+    Value: !Ref SessionsTable
