@@ -1,6 +1,7 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
+  DeleteCommand,
   QueryCommand,
   ScanCommand,
   UpdateCommand,
@@ -75,6 +76,15 @@ export async function handler() {
   );
   let sent = 0;
 
+  const pushErrorStatus = (error: unknown) => {
+    if (typeof error === "object" && error !== null) {
+      const value = error as { statusCode?: unknown; status?: unknown };
+      const status = value.statusCode ?? value.status;
+      return typeof status === "number" ? status : undefined;
+    }
+    return undefined;
+  };
+
   for (const deadline of (deadlinesResult.Items ?? []) as Deadline[]) {
     const days = daysUntilJst(deadline.deadlineAt);
     if (!reminderDays.has(days)) continue;
@@ -105,8 +115,8 @@ export async function handler() {
           ExpressionAttributeValues: { ":pk": item.pk, ":sk": "PUSH#" },
         }),
       );
-      await Promise.all(
-        (subscriptions.Items ?? []).map(async (subscription) => {
+      for (const subscription of subscriptions.Items ?? []) {
+        try {
           await webpush.sendNotification(
             subscription.subscription,
             JSON.stringify({
@@ -116,8 +126,36 @@ export async function handler() {
             }),
           );
           sent += 1;
-        }),
-      );
+        } catch (error) {
+          const statusCode = pushErrorStatus(error);
+          console.error(
+            JSON.stringify({
+              event: "push_delivery_failed",
+              statusCode,
+              message: error instanceof Error ? error.message : String(error),
+            }),
+          );
+
+          if (
+            (statusCode === 404 || statusCode === 410) &&
+            typeof subscription.pk === "string" &&
+            typeof subscription.sk === "string"
+          ) {
+            await dynamo.send(
+              new DeleteCommand({
+                TableName: userDataTable,
+                Key: { pk: subscription.pk, sk: subscription.sk },
+              }),
+            );
+            console.warn(
+              JSON.stringify({
+                event: "stale_push_subscription_deleted",
+                statusCode,
+              }),
+            );
+          }
+        }
+      }
       if (!item.notifiedDays) {
         await dynamo.send(
           new UpdateCommand({
